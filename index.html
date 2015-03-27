@@ -1,88 +1,130 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>My App</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
-    <link rel="stylesheet" href="css/app.min.css">
-    <style>
-      /* TODO */
-	  .app-button:hover {
-		cursor: pointer;
-	  }
-	  .app-button:active {
-		background-color: #eee;
-	  }
-    </style>
-  </head>
-
-  <body>
-    <div class="app-page" data-page="home">
-      <div class="app-topbar">
-        <div class="app-title">Home</div>
-      </div>
-      <div class="app-content">
-		<div class="devices">
-			<div class="app-section device">			
-				<div class="app-button" data-url="" data-target="device">Go to device</div>
+	<head>
+		<title>ELMO</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+		<link rel="stylesheet" href="css/app.min.css">
+		<style>
+			.app-button:hover {
+					cursor: pointer;
+			}
+			.app-button:active {
+				background-color: #eee;
+			}
+		</style>
+	</head>
+	<body>
+	
+		<div class="app-page" data-page="home">
+			<div class="app-topbar">
+				<div class="app-title">Home</div>
+				<div class="app-button right" data-target="settings">Settings</div>
 			</div>
-        </div>
-      </div>
-    </div>
-
-	<div class="app-page" data-page="device">
-      <div class="app-topbar">
-        <div class="app-button left" data-back data-autotitle></div>
-        <div class="app-title">Device: Lamp 1</div>
-      </div>
-      <div class="app-content">
-		<div class="app-section">
-			<div class="app-button">On/Off</div>
+			<div class="app-content">
+				<div class="devices">
+					<div class="app-section device">			
+						<div class="app-button" data-url=""></div>
+					</div>
+				</div>
+			</div>
 		</div>
-      </div>
-    </div>
-		
+
+		<div class="app-page" data-page="settings">
+			<div class="app-topbar">
+				<div class="app-title">Settings</div>
+				<div class="app-button right" data-target="home">Home</div>
+			</div>
+			<div class="app-content">
+				<div class="app-section">
+					<input class="app-input" id="ELMO_HOST" placeholder="http://hostip:port/" />
+					<div class="app-button" id="ELMO_HOST_SAVE">Save</div>
+				</div>
+			</div>
+		</div>
+
 	<script src="cordova.js"></script>
-    <script src="js/zepto.js"></script>
-    <script src="js/app.min.js"></script>
-    <script>
-      App.controller('home', function (page) {
+	<script src="js/zepto.js"></script>
+	<script src="js/app.min.js"></script>
+	<script>
 
-		$.getJSON('http://192.168.2.11:3000', function(devices){
+		var ELMO = {
+			host : '',
+		};
+		
+		App.controller('home', function (page) {
+			
+			if(ELMO.host == null) App.load('settings');
+			
+			$(page).find('.devices').hide();
+			
+			//Move this function to the device initialization
+			$.ajax({			
+				url: ELMO.host,
+				dataType: 'json',
+				success: function( devices ) {
 
-			var $template = $(page).find('.device').remove();
-			var $devices = $(page).find('.devices');
-			devices.forEach(function (device) {
-				
-				var parts = device.route.split('/');
-				//if(parts.length==1) {
-					//Add device
-				//} else {
-					//Add group
-				//}
-				
-				var $device = $template.clone(true);
-				$device.children('.app-button').html(parts.join(' '));
-				$device.children('.app-button').data('url','http://'+device.ip+':'+device.port+'/'+device.route);
-				$devices.append($device);
+					if(devices.length > 0) {	
+						var $template = $(page).find('.device').remove();
+						var $devices = $(page).find('.devices');
+						devices.forEach(function (device) {
+							var parts = device.route.split('/');
+							var $device = $template.clone(true);
+							$device.children('.app-button').html(parts.join(' '));
+							$device.children('.app-button').data('url','http://'+device.ip+':'+device.port+'/'+device.route);
+							$devices.append($device);							
+						});						
+						$('.app-button').click(function() {
+							$.post($(this).data('url'), { toggle: 1 }, function(response){
+								// process response
+							});				
+						});						
+						$(".devices").show();
+					}
+					
+				},
+				error: function() {
+					/*App.dialog({
+						title        : 'Server not found',
+						text         : 'Maybe the server address is wrong...',
+						okButton     : 'I\'ll check!'
+					});*/
+				}
 			});
-			$('.app-button').click(function() {
-				$.post($(this).data('url'), { toggle: 1 }, function(response){
-				  // process response
-				});
-			});
+
 		});
 
-      });
+		App.controller('settings', function(page) {
+		
+			if(ELMO.host !== null) {
+				 $(page)
+				 .find("#ELMO_HOST")
+				 .val(ELMO.host);
+			}
+			
+			$(page)
+			.find('#ELMO_HOST_SAVE')
+			.on('click', function () {			
+				ELMO.host = $("#ELMO_HOST").val(); 
+				if(ELMO.host.substr(-1)!='/') ELMO.host += '/';
+				window.localStorage.setItem("ELMO_HOST", ELMO.host);
+				App.load('home');
+			});
+			
+		});
+		
+		document.addEventListener('deviceready', function() {
+		
+			ELMO.host = window.localStorage.getItem('ELMO_HOST');
+			
+			try {
+				App.restore();
+			} catch (err) {
+				App.load('home');
+			}
+			
+		}, false); 
 
-	  App.controller('device', function (page) {
-        // put stuff here
-      });
-	  
-      try {
-        App.restore();
-      } catch (err) {
-        App.load('home');
-      }
-    </script>
+	</script>
+	
   </body>
 </html>
